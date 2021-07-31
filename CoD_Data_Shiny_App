@@ -1,1 +1,149 @@
-test
+library(shiny)
+library(readxl)
+library(cluster)
+library(ggvis)
+library(shinythemes)
+library(tidyverse)
+library(ggpubr)
+
+#k means clustering analysis for Call of Duty data set
+COD_Data_for_DS501 = read_excel("COD Data for DS501.xlsx")
+#remove first column for clustering analysis
+CD = COD_Data_for_DS501[,-1]
+# k means centers loop
+wss = kmeans(CD, centers=1)$tot.withinss
+for (i in 2:15)
+  wss[i] = kmeans(CD, centers=i)$tot.withinss
+#sse analysis to pick # of clusters
+sse = data.frame(c(1:15), c(wss))
+names(sse)[1] = 'Clusters'
+names(sse)[2] = 'SSE'
+sse %>%
+  ggvis(~Clusters, ~SSE) %>%
+  layer_points(fill := 'blue') %>% 
+  layer_lines() %>%
+  set_options(height = 300, width = 400)
+
+clusters = kmeans(CD, 4)
+COD_Data_for_DS501$Cluster = clusters$cluster
+CDClusplot = clusplot(CD, clusters$cluster, color=T, shade=F,labels=0,lines=0, main="Call of Duty Stats K Means Analysis")
+
+variables = names(CD)
+
+ui <- navbarPage(theme = shinytheme("cerulean"),
+                  "COD K-Means",
+                 
+                 tabPanel(
+                   "Data Overview",
+                   headerPanel("Call of Duty Stats K Means Clustering"),
+                   mainPanel(
+                    
+                       "The following is a clustering and correlation analysis on data from Call of Duty. I selected this data set because I have 
+                        been playing these games for most of my life and I thought it would be interesting and fun to explore video game data.
+                         There are many statistics in this video game,
+                         and it may be interesting to observe them and how they interact within a k-means cluster. Please feel free to explore
+                         the data with the data table below, and observe the following categories of Call of Duty stats: wins, kills,
+                         kill-death ratio, highest kill streak, losses, headshots, misses, and score per minute. What I find interesting is
+                         typing in a specific number at the bottom of the data table, like killstreak = 7, and 
+                         exploring those players' statistics across the board. A k-means clustering analysis 
+                         is used in this app because it is a popular unsupervised machine learning algorith. This data set is partitioned into
+                         a set of groups and objects in the groups are classified to be as similar as possible. A sum of squared errors analysis
+                         was performed to help me decide how many clusters to use in the analysis. Then, I generated a plot which you can observe
+                         in the second tab. Finally, play around with a correlation analysis on the third tab! You can select which variables you'd
+                         like to see compared to one another and a scatterplot will be generated with the comparison of
+                         these variables. Correlation can help you better
+                          understand, for example, if kills and wins are related!"
+                   ),
+                     mainPanel(
+                       dataTableOutput('CDplot')
+                    )
+                 
+),
+                tabPanel("K-Means Analysis",
+                                  headerPanel(
+                                    "Clustering Chart"
+                                  ),
+                                  mainPanel(
+                                    "Here we can observe the k-means clustering analysis for the Call of Duty data.
+                                     This was performed with the cluster() package and uses 4 clusters, which seemed to be
+                                    ideal based on the sse analysis. You can observe at the bottom of the graph that
+                                    the two components, on the x axis and the y axis, explain 76.47% of the point variability.
+                                    That is relatively successful when it comes to a k-mean analysis. The myriad of different
+                                    factors in this group of call of duty statistics makes it confusing at first to run a cluster on,
+                                    but is possible once the ideal number of clusters is found and the analysis is plotted.",
+                                    plotOutput('plot1')
+                                  ),
+                                  headerPanel(h3(
+                                    "Below is some of the k-means analysis code for you to get a better understanding of
+                                    how the process works:")
+                                  ),
+                         mainPanel(
+                           "CD = COD_Data_for_DS501[,-1]"
+                         ),
+                                  mainPanel(
+                                    "wss = kmeans(CD, centers=1)$tot.withinss"
+                                  ),
+                         mainPanel(
+                           "for (i in 2:15)
+                             wss[i] = kmeans(CD, centers=i)$tot.withinss"
+                         ),
+                         mainPanel(
+                           "sse = data.frame(c(1:15), c(wss))"
+                         ),
+                         mainPanel(
+                           "names(sse)[1] = 'Clusters'
+                              names(sse)[2] = 'SSE'"
+                         ),
+                         mainPanel(
+                           "
+                            sse %>%
+                              ggvis(~Clusters, ~SSE) %>%
+                              layer_points(fill := 'blue') %>% 
+                              layer_lines() %>%
+                              set_options(height = 300, width = 400)"
+                         ),
+                         mainPanel("clusters = kmeans(CD, 4)
+                                   "),
+                         mainPanel(
+                           "COD_Data_for_DS501$Cluster = clusters$cluster"
+                         ),
+                         mainPanel(
+                           "CDClusplot = clusplot(CD, clusters$cluster, color=T, shade=F,labels=0,lines=0, main=Call of Duty Stats K Means Analysis)"
+                         ),
+                ),
+                tabPanel("Correlation Metrics",
+                         headerPanel("Correlations Between Different COD Stats"),
+                         mainPanel(
+                           "Now I would like to show some correlation metrics to give a better understanding of which Call of Duty
+                           stats really correlate with others. Please select the variables that you are interested and observe
+                           which CoD stats correlate!",
+                          
+                           selectInput('var1', "X Variable", variables),
+                           selectInput('var2', "Y Variable", variables, selected = variables[[2]]),
+                           plotOutput('correlation')
+                       
+                        
+                         )
+
+))
+server <- function(input, output){
+  output$CDplot = renderDataTable(
+    COD_Data_for_DS501
+  )
+  output$plot1 = renderPlot(
+    {clusplot(CD, clusters$cluster, color=T, shade=F,labels=0,lines=0, main="Call of Duty Stats K Means Analysis")
+}
+  )
+
+ 
+  output$correlation = renderPlot({
+    req(input$var1)
+    req(input$var2)
+    x <- CD[[input$var1]]
+    y <- CD[[input$var2]]
+    plot(x, y)
+  })
+ 
+  
+}
+shinyApp(ui = ui, server = server)
